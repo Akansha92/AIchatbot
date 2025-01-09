@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive 3D Chatbot</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Poppins', sans-serif;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #121212; /* Dark background for a sober feel */
+        }
+
+        canvas {
+            position: absolute;
+            z-index: -1; /* Keep canvas in the background */
+        }
+
+        #chat-container {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 350px;
+            height: 500px;
+            background: rgba(255, 255, 255, 0.1); /* Slightly transparent */
+            backdrop-filter: blur(8px); /* Softer blur */
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.2); /* Subtle border */
+        }
+
+        #chat-title {
+            text-align: center;
+            font-size: 20px;
+            font-weight: 600;
+            color: #FFFFFF;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.5); /* Darker header for a sober look */
+            text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.5);
+            border-top-left-radius: 10px;
+            border-top-right-radius: 10px;
+        }
+
+        #messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            scroll-behavior: smooth;
+            color: #ddd; /* Lighter text color for readability */
+        }
+
+        .message {
+            padding: 10px 15px;
+            border-radius: 10px;
+            max-width: 75%;
+            word-wrap: break-word;
+        }
+
+        .user-message {
+            align-self: flex-end;
+            background: #3a3a3a; /* Dark gray for user messages */
+            color: #ffffff;
+        }
+
+        .bot-message {
+            align-self: flex-start;
+            background: #444444; /* Slightly lighter gray for bot messages */
+            color: #ffffff;
+        }
+
+        #input-area {
+            display: flex;
+            padding: 12px;
+            gap: 10px;
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        #user-input {
+            flex: 1;
+            padding: 12px 15px;
+            border-radius: 20px;
+            border: none;
+            outline: none;
+            font-size: 16px;
+            background-color: #222222; /* Darker input field */
+            color: #fff; /* White text */
+        }
+
+        #send-btn {
+            padding: 12px 20px;
+            border-radius: 20px;
+            border: none;
+            background: #2a5298; /* Blue button */
+            color: white;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s ease;
+        }
+
+        #send-btn:hover {
+            background-color: #1e3c72; /* Darker blue on hover */
+        }
+    </style>
+</head>
+<body>
+    <canvas id="bg"></canvas>
+    <div id="chat-container">
+        <div id="chat-title">How can I assist you?</div>
+        <div id="messages"></div>
+        <div id="input-area">
+            <input type="text" id="user-input" placeholder="Type your message..." onkeydown="if(event.key === 'Enter') sendMessage();">
+            <button id="send-btn" onclick="sendMessage()">Send</button>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Chat functionality
+        const messagesDiv = document.getElementById('messages');
+        const userInput = document.getElementById('user-input');
+
+        function sendMessage() {
+            const userMessage = userInput.value.trim();
+            if (!userMessage) return;
+
+            addMessage('user', userMessage);
+
+            fetch('http://127.0.0.1:5000/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ message: userMessage })
+            })
+            .then(response => response.json())
+            .then(data => {
+                addMessage('bot', data.response);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                addMessage('bot', "Sorry, something went wrong!");
+            });
+
+            userInput.value = '';
+        }
+
+        function addMessage(sender, text) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message');
+            messageDiv.classList.add(sender === 'user' ? 'user-message' : 'bot-message');
+            messageDiv.textContent = text;
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        // 3D Interactive Background with Three.js
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({
+            canvas: document.querySelector('#bg'),
+        });
+
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        camera.position.setZ(30);
+
+        // Gradient Background
+        const gradientTexture = new THREE.TextureLoader().load('https://via.placeholder.com/1080x1920'); // Add a gradient image URL
+        scene.background = gradientTexture;
+
+        // 3D Elements: Sphere
+        const sphereGeometry = new THREE.SphereGeometry(8, 32, 32);
+        const sphereMaterial = new THREE.MeshStandardMaterial({ color: 0x2a5298 });
+        const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+
+        scene.add(sphere);
+
+        // Additional 3D Elements: Cube
+        const cubeGeometry = new THREE.BoxGeometry(5, 5, 5);
+        const cubeMaterial = new THREE.MeshStandardMaterial({ color: 0x8e44ad });
+        const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+        cube.position.x = 15;
+        scene.add(cube);
+
+        // Additional 3D Elements: Torus Knot
+        const torusKnotGeometry = new THREE.TorusKnotGeometry(6, 2, 100, 16);
+        const torusKnotMaterial = new THREE.MeshStandardMaterial({ color: 0xe74c3c });
+        const torusKnot = new THREE.Mesh(torusKnotGeometry, torusKnotMaterial);
+        torusKnot.position.x = -15;
+        scene.add(torusKnot);
+
+        // Lights
+        const pointLight = new THREE.PointLight(0xffffff);
+        pointLight.position.set(20, 20, 20);
+
+        const ambientLight = new THREE.AmbientLight(0x222222); // Subdued light for a more minimal effect
+        scene.add(pointLight, ambientLight);
+
+        // Create Random Stars
+        function addStar() {
+            const geometry = new THREE.SphereGeometry(Math.random() * 0.5, 24, 24); // Varying sizes
+            const material = new THREE.MeshStandardMaterial({ color: Math.random() * 0xffffff }); // Random colors
+            const star = new THREE.Mesh(geometry, material);
+
+            const [x, y, z] = Array(3).fill().map(() => THREE.MathUtils.randFloatSpread(100));
+            star.position.set(x, y, z);
+            scene.add(star);
+        }
+
+        Array(300).fill().forEach(addStar); // Add 300 stars for a denser effect
+
+        // Animate the 3D Elements
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Rotate all elements
+            sphere.rotation.x += 0.01;
+            sphere.rotation.y += 0.01;
+
+            cube.rotation.x += 0.01;
+            cube.rotation.y += 0.01;
+
+            torusKnot.rotation.x += 0.01;
+            torusKnot.rotation.y += 0.01;
+
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+        // Responsive canvas
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Mouse movement interaction to change the background and sphere rotation
+        let mouseX = 0;
+        let mouseY = 0;
+
+        document.addEventListener('mousemove', (event) => {
+            mouseX = (event.clientX / window.innerWidth) * 2 - 1;  // Normalize to [-1, 1]
+            mouseY = -(event.clientY / window.innerHeight) * 2 + 1; // Normalize to [-1, 1]
+
+            // Rotate elements based on mouse movement
+            sphere.rotation.x = mouseY * Math.PI;
+            sphere.rotation.y = mouseX * Math.PI;
+
+            cube.rotation.x = mouseY * Math.PI;
+            cube.rotation.y = mouseX * Math.PI;
+
+            torusKnot.rotation.x = mouseY * Math.PI;
+            torusKnot.rotation.y = mouseX * Math.PI;
+
+            // Adjust camera position to give a floating effect
+            camera.position.x = mouseX * 10;
+            camera.position.y = mouseY * 10;
+            camera.lookAt(sphere.position);
+        });
+    </script>
+</body>
+</html>
+
+
+
